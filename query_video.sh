@@ -1,5 +1,10 @@
 #!/usr/bin/bash
 
+# This script reads a csv file what contains songs with Title,Artist format to be read
+# To search that song on youtube and to pick that song to be download or not.
+
+songs_list=()
+
 usage() {
     cat <<EOF
 
@@ -14,6 +19,10 @@ EOF
 }
 
 read_csv() {
+    # Read a csv file that contains Title,Artist as column, gets the information
+    # from those two columns and save the content in a list.
+    # It will exit with 1 if csv file don't have Title,Artist in the first row.
+    
     local headers
     local indices
     local songs
@@ -21,11 +30,17 @@ read_csv() {
     local i
 
     path="$1"
-    headers=$(< "$path" grep -E '[Tt]itle')
-    headers=$(echo "$headers" | tr '[:upper:]' '[:lower:]')
+    headers=$(head -n 1 "$path" | tr '[:upper:]' '[:lower:]')
+    # Check headers Title and Artist exist
+    if [[ "$headers" != *title* ]] || [[ "$headers" != *artist* ]]; then
+        echo "Error: Headers from the first line should have column Title,Artist"
+        exit 1
+    fi
+
     indices=()
     i=1
 
+    # Get comlumn indices from Title,Artist
     for header in ${headers//,/ }; do
         if [[ "$header" = "title" ]] || [[ "$header" = "artist" ]]; then
             indices+=("$i")
@@ -33,12 +48,7 @@ read_csv() {
         i=$((i+1))
     done
 
-    songs=$(< "$path" cut -f"${indices[0]}","${indices[1]}" -s -d,) 
-    songs=$(tail -n +2 <<< "$songs")
-    songs="${songs//\",\"/ - }"
-    songs=$(sed -e 's/^"//' -e 's/"$//' <<< "$songs")
-    
-    songs_list=()
+    songs=$(sed '1d' "$path" | cut -f"${indices[0]}","${indices[1]}" -s -d, | sed 's/^"//;s/"$//')
     while IFS= read -r line; do
         songs_list+=("$line")
     done <<< "$songs"
