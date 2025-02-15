@@ -55,9 +55,8 @@ read_csv() {
 
 prompt_user_song() {
     # Select the corresponding song number or "c" to cancel selection, saving the user choice in "option"
-    local i
 
-    i=1
+    local i=1
     for song in "${songs_list[@]}"; do
         printf "[%s]\t%s\n" "$i" "$song"
         ((i++))
@@ -84,6 +83,7 @@ prompt_user_song() {
 
 get_yt_id() {
     # Will save Title and Youtube URL in a list yt_urls based on the user's choice
+
     yt_urls=()
 
     local no_songs="$1"
@@ -99,7 +99,7 @@ get_yt_id() {
 }
 
 remove_song_csv() {
-    # Removes a song given a csv file and index song
+    # Removes a song given a csv file and index song, index song starts from 1 to ignore csv header
 
     local csv_path="$1"
     local index_song="$2"
