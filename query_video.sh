@@ -28,21 +28,17 @@ read_csv() {
     # It will exit with 1 if csv file don't have Title,Artist in the first row.
     
     local headers
-    local indices
     local songs
-    local path
-    local i
+    local indices=()
+    local path="$1"
+    local i=1
 
-    path="$1"
     headers=$(head -n 1 "$path" | tr '[:upper:]' '[:lower:]')
     # Check headers Title and Artist exist
     if [[ "$headers" != *title* || "$headers" != *artist* ]]; then
         echo "Error: Headers from the first line should have column Title,Artist"
         exit 1
     fi
-
-    indices=()
-    i=1
 
     # Get comlumn indices from Title,Artist
     for header in ${headers//,/ }; do
@@ -102,13 +98,22 @@ get_yt_id() {
     mapfile -t yt_urls <<< "$urls"
 }
 
-main() {
-    local LIMIT_PARAM
-    local no_songs
-    local file_path
+remove_song_csv() {
+    # Removes a song given a csv file and index song
 
-    LIMIT_PARAM=1
-    no_songs=3
+    local csv_path="$1"
+    local index_song="$2"
+    # Increase because starting from 1 is the header, we want to ignore the header
+    ((index_song++))
+
+    sed -i "$index_song"'d' "$csv_path"
+}
+
+main() {
+    local LIMIT_PARAM=1
+    local no_songs=3
+    local file_path
+    local url
 
     if [[ "$#" -ne $LIMIT_PARAM ]]; then
         usage
@@ -121,9 +126,9 @@ main() {
         exit 1
     fi
 
-    read_csv "$file_path"
-
     while true; do
+        read_csv "$file_path"
+
         # Select the corresponding song number or "c" to cancel selection, saving the user choice in "option"
         local i=1
         for song in "${songs_list[@]}"; do
@@ -133,40 +138,61 @@ main() {
 
         local max_index=$((i - 1))
 
-        read -rp "Enter song number or [c] to cancel: " option_song
+        read -rp "enter song number or [c] to cancel: " index_song
 
         # Just exit if the user decides to cancel
-        if [[ "$option_song" =~ ^[cC]$ ]]; then
+        if [[ "$index_song" =~ ^[cC]$ ]]; then
             break
         fi
 
+        local index_song_bkp="$index_song"
+
         # Check if it is a number and it is in range
-        if [[ "$option_song" =~ ^[0-9]+$ ]] && ((option_song >= 1 && option_song <= max_index)); then
-            printf "\n%s\n" "[INFO] You have selected \"${songs_list[option_song-1]}\", getting URLS..."
-            get_yt_id "$no_songs" "$option_song"
+        if [[ "$index_song" =~ ^[0-9]+$ ]] && ((index_song >= 1 && index_song <= max_index)); then
+            printf "\n%s\n" "[INFO] You have selected \"${songs_list[index_song-1]}\", getting URLS..."
+            get_yt_id "$no_songs" "$index_song"
 
             while true; do
                 i=1
-                for url in "${yt_urls[@]}"; do
-                    printf "[%s]\t%s\n" "$i" "$url"
+                for url_i in "${yt_urls[@]}"; do
+                    printf "[%s]\t%s\n" "$i" "$url_i"
                     ((i++))
                 done
 
-                read -rp "Enter url number or [c] to cancel: " option_url
+                read -rp "Enter url number or [c] to cancel: " index_url
 
                 # Just exit if the user decides to cancel
-                if [[ "$option_url" =~ ^[cC]$ ]]; then
+                if [[ "$index_url" =~ ^[cC]$ ]]; then
+                    if [[ -n "$url" ]]; then
+                        echo "[INFO]: You have selected ${yt_urls[index_url]}"
+                        echo "[INFO]: Copied to the clipboard"
+                    fi
                     break
                 fi
 
-                ((option_url--))
-                local url
-                url=$(echo "${yt_urls[option_url]}" | grep -Eo 'https?://[^ >)]+')
-
+                ((index_url--))
+                url=$(echo "${yt_urls[index_url]}" | grep -Eo 'https?://[^ >)]+')
                 brave-browser --new-window "$url"
             done
         fi
+
+        if [[ -n ${yt_urls[index_song_bkp]} ]]; then
+            read -rp "Remove song: \"${songs_list[index_song_bkp - 1]}\"? y/n: " remove_option
+
+            if [[ "$remove_option" =~ [Yy] ]]; then
+                echo "[INFO]: Removing song \"${songs_list[index_song_bkp - 1]}\""
+                remove_song_csv "$file_path" "$index_song_bkp"
+            fi
+        fi
+
+        if [[ -n "$url" ]]; then
+            # Thanks: https://stackoverflow.com/questions/5130968/how-can-i-copy-the-output-of-a-command-directly-into-my-clipboard
+            # Copy url to the clipboard
+            echo "$url" | xclip -sel clip
+            break
+        fi
     done;
+
 }
 
 main "$@"
