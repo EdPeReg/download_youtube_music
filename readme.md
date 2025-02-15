@@ -4,6 +4,7 @@
 - I'm using YtDlp from ruby library, this library doesn't have support to show the progress, because the --print-json flag in its command, this is required to get json information and download the video. Workaroud, run yt-dlp directly from cmd or use another library or wait until YtDlp supports to show progress using hooks.
 - It is better to pass the `$@` to the main function instead the single argument `$1` because if you don't pass `$1` to main, it will be a single empty string and still count as argument, passing `$@` it won't make this happen.
 - `shellcheck` was used to analize the `query_video.sh`
+- If you use `echo` or `printf` before `read`, you will need to flush the buffer.
 
 # References
 
