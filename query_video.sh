@@ -81,7 +81,7 @@ get_yt_id() {
 }
 
 remove_song_csv() {
-    # Removes a song given a csv file and index song, index song starts from 1 to ignore csv header
+    # Removes a song given a csv file and index song
     #
     # Parameters:
     #   $1: csv file path that  contains the list songs
@@ -89,7 +89,7 @@ remove_song_csv() {
 
     local csv_path="$1"
     local index_song="$2"
-    # Increase because starting from 1 is the header, we want to ignore the header
+    # By incrementing again, we will get the correct position.
     ((index_song++))
 
     sed -i "$index_song"'d' "$csv_path"
@@ -177,7 +177,8 @@ main() {
 
                 if [[ "$remove_option" =~ [Yy] ]]; then
                     echo "[INFO]: Removing song \"${songs_list[index_song_bkp]}\""
-                    remove_song_csv "$file_path" "$index_song_bkp"
+                    # We increase + 1 because the csv starts with 1 and not 0.
+                    remove_song_csv "$file_path" $((index_song_bkp + 1))
                 fi
             fi
         fi
