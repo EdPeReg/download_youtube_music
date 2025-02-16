@@ -73,9 +73,6 @@ get_yt_id() {
 
     local num_songs="$1"
     local option="$2"
-
-    # option choice starts with 1 and not 0
-    ((option--))
     local song="${songs_list[option]}"
 
     local urls
@@ -151,11 +148,12 @@ main() {
             break
         fi
 
+        ((index_song--))
         local index_song_bkp="$index_song"
 
         # Check if it is a number and it is in range
-        if [[ "$index_song" =~ ^[0-9]+$ ]] && ((index_song >= 1 && index_song <= "${#songs_list[@]}")); then
-            printf "\n%s\n" "[INFO] You have selected \"${songs_list[index_song-1]}\", getting URLS..."
+        if [[ "$index_song" =~ ^[0-9]+$ ]] && ((index_song >= 0 && index_song < "${#songs_list[@]}")); then
+            printf "\n%s\n" "[INFO] You have selected \"${songs_list[index_song]}\", getting URLS..."
             get_yt_id "$no_songs" "$index_song"
 
             while true; do
@@ -173,14 +171,14 @@ main() {
                 url=$(echo "$song" | grep -Eo 'https?://[^ >)]+')
                 brave-browser --new-window "$url"
             done
-        fi
 
-        if [[ -n ${songs_list[index_song_bkp]} ]]; then
-            read -rp "Remove song from the csv: \"${songs_list[index_song_bkp - 1]}\"? y/n: " remove_option
+            if [[ -n ${songs_list[index_song_bkp]} ]]; then
+                read -rp "Remove song from the csv: \"${songs_list[index_song_bkp]}\"? y/n: " remove_option
 
-            if [[ "$remove_option" =~ [Yy] ]]; then
-                echo "[INFO]: Removing song \"${songs_list[index_song_bkp - 1]}\""
-                remove_song_csv "$file_path" "$index_song_bkp"
+                if [[ "$remove_option" =~ [Yy] ]]; then
+                    echo "[INFO]: Removing song \"${songs_list[index_song_bkp]}\""
+                    remove_song_csv "$file_path" "$index_song_bkp"
+                fi
             fi
         fi
 
@@ -192,7 +190,6 @@ main() {
             break
         fi
     done;
-
 }
 
 main "$@"
