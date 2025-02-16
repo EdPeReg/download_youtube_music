@@ -11,6 +11,9 @@ require 'yt-dlp.rb'
 # Thanks copilot for this regex.
 TIME_RANGE_REGEX = /^(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d-(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d$/
 
+# Save script location
+ROOT_FOLDER_SCRIPT = File.dirname(File.realpath(__FILE__))
+
 def default_download_options = {
     format: "ba",
     progress: true,
@@ -53,7 +56,7 @@ def handle_chapters(chapters)
 end
 
 def rename_file_if_needed(file_name, path)
-    option = prompt("Rename the file with name: '#{file_name}?' y/n -> ")
+    option = prompt("Rename the file with name: '#{file_name}'? y/n -> ")
     return file_name unless option.downcase == 'y'
 
     file_name = prompt("Enter new file name without extension, optionally you can enter Artist name, eg. 'Queen - ' -> ")
@@ -116,6 +119,9 @@ def download_song(path)
     options[:output] = "#{file_name}.%(ext)s"
     download_audio(url, options)
     verify_download(file_name, path)
+
+    # Go back to the folder where the script is
+    Dir.chdir(ROOT_FOLDER_SCRIPT)
 end
 
 def create_folder(path)
