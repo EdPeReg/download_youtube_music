@@ -4,7 +4,6 @@
 # TODO: If artist name doesnt exist in the youtube title, put it automatically
 
 require 'fileutils'
-require 'open3'
 
 require 'yt-dlp.rb'
 
@@ -18,13 +17,6 @@ def default_download_options = {
     extract_audio: true,
     audio_format: "mp3",
 }
-
-def my_hook(d)
-    puts "dentro de my_hook"
-   if d["status"] == "downloading"
-       puts "#{d["filename"]}, #{d["_percent_str"]}"
-   end
-end
 
 def prompt(message)
     print message
@@ -172,6 +164,10 @@ def play_song(songs)
     system("vlc", "#{song}")
 end
 
+def run_query_video(csv_path)
+    system("./query_video.sh", "#{csv_path}")
+end
+
 def main
     root_folder = File.join(Dir.home, "/Music/Music")
     
@@ -180,6 +176,7 @@ def main
         puts "[F]ind Song/Artist"
         puts "[R]ename song"
         puts "[P]lay song"
+        puts "[G]et song from csv"
         puts "[E]xit"
 
         option = prompt("Enter an option -> ").downcase
@@ -213,6 +210,15 @@ def main
         when "p" # Play song
             songs = search_files(root_folder, prompt("\nPlease enter the song/artist name: ").downcase)
             songs.empty? ? puts("[Info] Song/Artist not found\n") : play_song(songs)
+
+        when "g" # Get song from csv
+            begin
+                csv_path = prompt("\nEnter csv file path: ").downcase
+                csv_path_abs = File.realpath(csv_path)
+                run_query_video(csv_path_abs)
+            rescue Errno::ENOENT
+                puts("[ERROR]: File #{csv_path} doesn't exist, make sure csv file exist.")
+            end
 
         when "e" # Exit
             puts "BYE :)"
