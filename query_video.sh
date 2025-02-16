@@ -175,7 +175,7 @@ main() {
             done
         fi
 
-        if [[ -n ${yt_urls[index_song_bkp]} ]]; then
+        if [[ -n ${songs_list[index_song_bkp]} ]]; then
             read -rp "Remove song from the csv: \"${songs_list[index_song_bkp - 1]}\"? y/n: " remove_option
 
             if [[ "$remove_option" =~ [Yy] ]]; then
