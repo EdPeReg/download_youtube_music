@@ -121,6 +121,26 @@ select_from_list() {
     echo "$selected_index"
 }
 
+# find_song() {
+#     local -n list="$1"
+#     local index="$2"
+#     local csv_path="$3"
+#     local music_root_folder=$HOME/Music/Music
+
+#     if [[ -n $(find "$music_root_folder" -type f -iname "*${list[index]}*") ]]; then
+#         read -rp "[INFO]: Song found, you want to remove it? Y/N: " remove_option
+
+#         if [[ "$remove_option" =~ ^[Yy]$ ]]; then
+#             echo "[INFO]: Removing song \"${list[index]}\""
+#             remove_song_csv "$file_path" $((index_song + 1))
+
+#             return 0  # Let's return this as successful value
+#         fi
+#     fi
+
+#     return 1 # Not found or decide not to remove it.
+# }
+
 main() {
     local LIMIT_PARAM=1
     local no_songs=3
@@ -154,6 +174,10 @@ main() {
         # Check if it is a number and it is in range
         if [[ "$index_song" =~ ^[0-9]+$ ]] && ((index_song >= 0 && index_song < "${#songs_list[@]}")); then
             printf "\n%s\n" "[INFO] You have selected \"${songs_list[index_song]}\", getting URLS..."
+
+            # song_found=$(find_song songs_list "$index_song" "$file_path")
+            # if ((song_found == 0)) then continue; fi
+
             get_yt_id "$no_songs" "$index_song"
 
             while true; do
@@ -182,15 +206,14 @@ main() {
                 fi
             fi
         fi
-
-        if [[ -n "$url" ]]; then
-            # Thanks: https://stackoverflow.com/questions/5130968/how-can-i-copy-the-output-of-a-command-directly-into-my-clipboard
-            # Copy url to the clipboard
-            echo "$url" | xclip -sel clip
-            echo "[INFO]: Copied to the clipboard"
-            break
-        fi
     done;
+
+    if [[ -n "$url" ]]; then
+        # Thanks: https://stackoverflow.com/questions/5130968/how-can-i-copy-the-output-of-a-command-directly-into-my-clipboard
+        # Copy url to the clipboard
+        echo "$url" | xclip -sel clip
+        echo "[INFO]: Copied $url to the clipboard"
+    fi
 }
 
 main "$@"
