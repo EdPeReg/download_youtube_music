@@ -121,32 +121,71 @@ select_from_list() {
     echo "$selected_index"
 }
 
-# find_song() {
-#     local -n list="$1"
-#     local index="$2"
-#     local csv_path="$3"
-#     local music_root_folder=$HOME/Music/Music
+get_artist_songs() {
+    # Get all the songs given an artist
+    #
+    # Parameters:
+    #   $1: Artist name
+    #   $2: Path where the artist songs can be found
+    #
+    # Returns:
+    #   artist_songs(): Global array that contains all the songs from the artist.
+    #   0: If we find songs
+    #   1: If we did not find songs
+    local artist_name="$1"
+    local music_path="$2"
+    local songs
 
-#     if [[ -n $(find "$music_root_folder" -type f -iname "*${list[index]}*") ]]; then
-#         read -rp "[INFO]: Song found, you want to remove it? Y/N: " remove_option
+    songs=$(find "$music_path" -type d -iname "*$artist_name*" -exec ls {} \;)
+    mapfile -t artist_songs <<< "$songs"
 
-#         if [[ "$remove_option" =~ ^[Yy]$ ]]; then
-#             echo "[INFO]: Removing song \"${list[index]}\""
-#             remove_song_csv "$file_path" $((index_song + 1))
+    # We didnt find any song
+    if [[ -z "$songs" ]]; then
+        return 1
+    else
+        # We find songs
+        return 0
+    fi
+}
 
-#             return 0  # Let's return this as successful value
-#         fi
-#     fi
+song_exist() {
+    # Check if the song exist in the artst_songs list
+    #
+    # Parameters:
+    #   $1: Song index based on songs_list
+    #
+    # Returns:
+    #   0 if song was found, 1 if song wasn't found
 
-#     return 1 # Not found or decide not to remove it.
-# }
+    local index_song="$1"
+    local artist_song
+    local artist_name
+
+    # Format is "Song name - Artist"
+    # Get the song name and artist, remove at the beggining and and the end the empty space
+    artist_song=$(echo "${songs_list[index_song]}" | awk -F ' - ' '{print $1}')
+    artist_name=$(echo "${songs_list[index_song]}" | awk -F ' - ' '{print $2}')
+
+    if get_artist_songs "$artist_name" "$music_path"; then
+        for s in "${artist_songs[@]}"; do
+            if grep -iq "$artist_song" <<< "$s"; then
+                return 0
+            fi
+        done
+    fi
+
+    return 1
+}
 
 main() {
     local LIMIT_PARAM=1
     local no_songs=3
     local file_path
+    # This can change to specify where the music is
+    local music_path=$HOME/Music/Music
     local url
     local song
+    local artist_name
 
     if [[ "$#" -ne $LIMIT_PARAM ]]; then
         usage
@@ -169,14 +208,22 @@ main() {
         fi
 
         ((index_song--))
-        local index_song_bkp="$index_song"
 
         # Check if it is a number and it is in range
         if [[ "$index_song" =~ ^[0-9]+$ ]] && ((index_song >= 0 && index_song < "${#songs_list[@]}")); then
             printf "\n%s\n" "[INFO] You have selected \"${songs_list[index_song]}\", getting URLS..."
 
-            # song_found=$(find_song songs_list "$index_song" "$file_path")
-            # if ((song_found == 0)) then continue; fi
+            if song_exist "$index_song"; then
+                read -rp "Song already exist, remove song from the csv: \"${songs_list[index_song]}\"? y/n: " remove_option
+
+                if [[ "$remove_option" =~ [Yy] ]]; then
+                    echo "[INFO]: Removing song \"${songs_list[index_song]}\""
+                    # We increase + 1 because the csv starts with 1 and not 0.
+                    remove_song_csv "$file_path" $((index_song + 1))
+                fi
+
+                continue
+            fi
 
             get_yt_id "$no_songs" "$index_song"
 
@@ -196,13 +243,13 @@ main() {
                 brave-browser --new-window "$url"
             done
 
-            if [[ -n ${songs_list[index_song_bkp]} ]]; then
-                read -rp "Remove song from the csv: \"${songs_list[index_song_bkp]}\"? y/n: " remove_option
+            if [[ -n ${songs_list[index_song]} ]]; then
+                read -rp "Remove song from the csv: \"${songs_list[index_song]}\"? y/n: " remove_option
 
                 if [[ "$remove_option" =~ [Yy] ]]; then
-                    echo "[INFO]: Removing song \"${songs_list[index_song_bkp]}\""
+                    echo "[INFO]: Removing song \"${songs_list[index_song]}\""
                     # We increase + 1 because the csv starts with 1 and not 0.
-                    remove_song_csv "$file_path" $((index_song_bkp + 1))
+                    remove_song_csv "$file_path" $((index_song + 1))
                 fi
             fi
         fi
