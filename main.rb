@@ -4,12 +4,15 @@
 # TODO: If artist name doesnt exist in the youtube title, put it automatically
 
 require 'fileutils'
+require "readline"
 
 require 'yt-dlp.rb'
 
 # For the hours, it will only accept until 23, I don't think you will find a video more than 23 hours long
 # Thanks copilot for this regex.
 TIME_RANGE_REGEX = /^(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d-(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d$/
+
+FILE_NAME = "history.txt"
 
 # Save script location
 ROOT_FOLDER_SCRIPT = File.dirname(File.realpath(__FILE__))
@@ -22,8 +25,7 @@ def default_download_options = {
 }
 
 def prompt(message)
-    print message
-    gets.chomp
+    Readline.readline(message, add_hist: true)
 end
 
 def search_files(root_folder, search_str)
@@ -141,7 +143,7 @@ end
 def rename_song(songs)
     list_songs(songs)
 
-    index = Integer(prompt("\nSelect the [number] you want to rename: ")) - 1
+    index = Integer(prompt("Select the [number] you want to rename: ")) - 1
     old_song = songs.at(index)
     return puts "[Error] File not found" unless old_song
 
@@ -164,7 +166,7 @@ end
 
 def play_song(songs)
     list_songs(songs)
-    index = Integer(prompt("\nSelect the [number] you want to play: ")) - 1
+    index = Integer(prompt("Select the [number] you want to play: ")) - 1
     song = songs.at(index)
     return puts "[Error] File not found" unless song
     system("vlc", "#{song}")
@@ -174,9 +176,35 @@ def run_query_video(csv_path)
     system("./query_video.sh", "#{csv_path}")
 end
 
+def load_history()
+    if File.exist?(FILE_NAME)
+        File.readlines(FILE_NAME).each { |line| Readline::HISTORY.push(line.chomp)}
+    end
+end
+
+def save_history
+    # Save the user input history in a file "history.txt"
+    #
+    # File will be created if does not exist and it will append
+    # each element.
+    #
+
+    # Save user input history in a text file called history.txt
+    # Remove duplicated elements.
+    unique_history = Readline::HISTORY.to_a.uniq
+    File.open(FILE_NAME, "w") do |f|
+        unique_history.to_a.each { |line| f.puts line.strip}
+    end
+end
+
 def main
     root_folder = File.join(Dir.home, "/Music/Music")
     
+    load_history
+    # Escape characters that can broke the regex.
+    completation = proc { |s| Readline::HISTORY.to_a.grep(/#{Regexp.escape(s)}/) }
+    Readline.completion_proc = completation
+
     loop do
         puts "\n[D]ownload song"
         puts "[F]ind Song/Artist"
@@ -193,7 +221,7 @@ def main
             # songs.empty? ? puts("[Info] Song/Artist not found\n") : list_songs(songs)
 
             # continue = prompt("Continue Y/N? ").downcase
-            str = prompt("\nEnter relative path to download the song starting from Music/ eg. Artist/folder1/folder2/... [c] to cancel -> " )
+            str = prompt("Enter relative path to download the song starting from Music/ eg. Artist/folder1/folder2/... [c] to cancel -> " )
             if str != 'c'
                 path = File.join(root_folder, str)
                     
@@ -206,20 +234,20 @@ def main
             end
 
         when "f" # Find
-            songs = search_files(root_folder, prompt("\nPlease enter the song/artist name: ").downcase)
+            songs = search_files(root_folder, prompt("Please enter the song/artist name: ").downcase)
             songs.empty? ? puts("[Info] Song/Artist not found\n") : list_songs(songs)
 
         when "r" # Rename
-            songs = search_files(root_folder, prompt("\nPlease enter the song/artist name: ").downcase)
+            songs = search_files(root_folder, prompt("Please enter the song/artist name: ").downcase)
             songs.empty? ? puts("[Info] Song/Artist not found\n") : rename_song(songs)
 
         when "p" # Play song
-            songs = search_files(root_folder, prompt("\nPlease enter the song/artist name: ").downcase)
+            songs = search_files(root_folder, prompt("Please enter the song/artist name: ").downcase)
             songs.empty? ? puts("[Info] Song/Artist not found\n") : play_song(songs)
 
         when "g" # Get song from csv
             begin
-                csv_path = prompt("\nEnter csv file path: ").downcase
+                csv_path = prompt("Enter csv file path: ").downcase
                 csv_path_abs = File.realpath(csv_path)
                 run_query_video(csv_path_abs)
             rescue Errno::ENOENT
@@ -234,6 +262,8 @@ def main
             puts "Please enter a valid option"
         end
     end
+
+    save_history
 end
 
 main

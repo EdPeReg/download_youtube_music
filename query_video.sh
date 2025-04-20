@@ -3,6 +3,7 @@
 # This script reads a csv file what contains songs with Title,Artist format to be read
 # To search that song on youtube and to pick that song to be download or not.
 # TODO: Validate that xclip and brave-browser are installed.
+# TODO: Remove repeated elements from the csv
 
 DEBUG_MODE=false
 if $DEBUG_MODE; then
