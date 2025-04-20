@@ -173,7 +173,7 @@ def play_song(songs)
 end
 
 def run_query_video(csv_path)
-    system("./query_video.sh", "#{csv_path}")
+    Process.detach(Process.spawn("kitty", "./query_video.sh", csv_path))
 end
 
 def load_history()
