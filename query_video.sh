@@ -262,6 +262,9 @@ main() {
         echo "$url" | xclip -sel clip
         echo "[INFO]: Copied $url to the clipboard"
     fi
+    # We need some time for xclip to copy the content to the clipboard
+    # otherwise it won't be copied.
+    sleep 1
 }
 
 main "$@"
