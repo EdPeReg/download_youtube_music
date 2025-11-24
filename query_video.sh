@@ -49,13 +49,18 @@ read_csv() {
         exit 1
     fi
 
-    # Get comlumn indices from Title,Artist
+    # Get column indices from Title,Artist
     for header in ${headers//,/ }; do
         if [[ "$header" = "title" || "$header" = "artist" ]]; then
             indices+=("$i")
         fi
         ((i++))
     done
+
+    # Taking as field separator ",", we want to check if we have seen already the "Title" field
+    # that has index 0, we replace the original csv file.
+    title_col=${indices[0]}
+    awk -F',' -v title_col="$title_col" '!seen[$title_col]++' "$csv_path" > tempfile && mv tempfile "$csv_path"
 
     # Delete the first row from the csv, get only the Title,Artist columns, remove the "" and replace "," with "-"
     songs=$(sed '1d' "$csv_path" | cut -f"${indices[0]}","${indices[1]}" -s -d, | sed 's/^"//;s/"$//' | sed 's/,/ - /g')
@@ -101,7 +106,7 @@ select_from_list() {
     #
     # Parameters:
     #   $1: Array passed by reference that contains the items.
-    #   $2: Custom message that wlil appear to prompt the user.
+    #   $2: Custom message that will appear to prompt the user.
     #
     # Returns:
     #
@@ -208,6 +213,7 @@ main() {
             break
         fi
 
+        # At first it is based in 1 and not 0, we put it as index base 0
         ((index_song--))
 
         # Check if it is a number and it is in range
