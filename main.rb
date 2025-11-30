@@ -7,6 +7,7 @@ require 'fileutils'
 require "readline"
 
 require 'yt-dlp.rb'
+require 'taglib'
 
 # For the hours, it will only accept until 23, I don't think you will find a video more than 23 hours long
 # Thanks copilot for this regex.
@@ -137,6 +138,7 @@ def create_folder(path)
 end
 
 def list_songs(songs)
+    # List songs in a list format starting from index 1
     songs.each_with_index {|song, index| puts "[#{index + 1}] #{song}"}
 end
 
@@ -176,7 +178,7 @@ def run_query_video(csv_path)
     Process.detach(Process.spawn("kitty", "./query_video.sh", csv_path))
 end
 
-def load_history()
+def load_history
     if File.exist?(FILE_NAME)
         File.readlines(FILE_NAME).each { |line| Readline::HISTORY.push(line.chomp)}
     end
@@ -197,6 +199,59 @@ def save_history
     end
 end
 
+def tag_song(songs)
+    # Tag metadata song
+    fields = [:comment, :album, :artist]
+
+    list_songs(songs)
+    index = Integer(prompt("Select the [number] you want to play: ")) - 1
+    song = songs[index]
+    unless song
+        puts "[Error] File not found" unless song
+        return
+    end
+
+    TagLib::FileRef.open(song) do |file|
+        if file.nil?
+            puts "[ERROR] Could not open file #{song}"
+            return
+        end
+
+        puts "[INFO] Selected song #{song}"
+        tag = file.tag
+        changed = false
+
+        fields.each do |field|
+            current = tag.send(field)
+            puts "[INFO] Current #{field}: #{current}"
+            new_value = prompt("[INFO] Enter a new #{field} value (empty to skip) -> ").to_s.strip
+            if new_value.empty?
+                changed = false
+                next
+            end
+
+            confirm = prompt("[INFO] Update #{field} to '#{new_value}'? y/n -> ").to_s.downcase
+            unless confirm == "y"
+                puts "[INFO] No changes made to #{field}"
+                changed = false
+                next
+            end
+
+            if !current.empty?
+                append = prompt("[INFO] #{field} already present, append? y/n -> ").to_s.downcase == "y"
+                tag.send("#{field}=", append ? "#{current}\n#{new_value}" : new_value)
+            else
+                tag.send("#{field}=", new_value)
+            end
+
+            puts "[INFO] #{field}: #{tag.send(field)}"
+            changed = true
+        end
+
+        file.save if changed
+    end
+end
+
 def main
     root_folder = File.join(Dir.home, "/Music/Music")
     
@@ -211,6 +266,7 @@ def main
         puts "[R]ename song"
         puts "[P]lay song"
         puts "[G]et song from csv"
+        puts "[T]ag song"
         puts "[E]xit"
 
         option = prompt("Enter an option -> ").downcase
@@ -253,6 +309,10 @@ def main
             rescue Errno::ENOENT
                 puts("[ERROR]: File #{csv_path} doesn't exist, make sure csv file exist.")
             end
+
+        when "t" # Tag song
+            songs = search_files(root_folder, prompt("Please enter the song/artist name: ").downcase)
+            songs.empty? ? puts("[Info] Song/Artist not found\n") : tag_song(songs)
 
         when "e" # Exit
             puts "BYE :)"
