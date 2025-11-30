@@ -226,14 +226,12 @@ def tag_song(songs)
             puts "[INFO] Current #{field}: #{current}"
             new_value = prompt("[INFO] Enter a new #{field} value (empty to skip) -> ").to_s.strip
             if new_value.empty?
-                changed = false
                 next
             end
 
             confirm = prompt("[INFO] Update #{field} to '#{new_value}'? y/n -> ").to_s.downcase
             unless confirm == "y"
                 puts "[INFO] No changes made to #{field}"
-                changed = false
                 next
             end
 
