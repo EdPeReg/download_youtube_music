@@ -250,12 +250,11 @@ def load_history
     end
 end
 
+# Save the user input history in a file "history.txt"
+#
+# File will be created if does not exist and it will append
+# each element.
 def save_history
-    # Save the user input history in a file "history.txt"
-    #
-    # File will be created if does not exist and it will append
-    # each element.
-    #
 
     # Save user input history in a text file called history.txt
     # Remove duplicated elements.
@@ -265,9 +264,13 @@ def save_history
     end
 end
 
+# Tag metadata song such as: comment, album, artist, title
+#
+# @param [Array<String>] songs Array that contains a list of songs
 def tag_song(songs)
-    # Tag metadata song
-    fields = [:comment, :album, :artist]
+    # Should match with the Tag functions from here:
+    # https://rubydoc.info/gems/taglib-ruby/TagLib/Tag#comment-instance_method
+    fields = [:comment, :album, :artist, :title]
 
     list_songs(songs)
     index = Integer(prompt("Select the [number] you want to play: ")) - 1
