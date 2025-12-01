@@ -25,17 +25,48 @@ def default_download_options = {
     audio_format: "mp3",
 }
 
+# sanitize a string to be safe as a filename (remove control and reserved chars)
+#
+# @param [String] name to be sanitized
+#
+# @return [String] String sanitized
+def sanitize_filename(name)
+  return "" if name.nil?
+  s = name.dup
+  # remove nulls and slashes, replace other reserved chars with space
+  s.gsub!("\0", "")
+  s.gsub!(%r{[\/]}, " ")
+  s.gsub!(%r{[<>:"\\|?*]}, "")
+  s.strip!
+  s.gsub!(/\s+/, " ")
+  s
+end
+
+# Helper function to prompt user information
 def prompt(message)
     Readline.readline(message, add_hist: true)
 end
 
+# Collects all files given a folder based in a string
+#
+# @param [String] root_folder
+#   Folder where we are going to start searching
+# @param [String] search_str
+#   String to be search
+#
+# @return [Array<String>] A list of files paths that match the search string, empty list if not matching
 def search_files(root_folder, search_str)
     # Save all the songs we have in our Music folder
     Dir.glob("#{root_folder}/**/*").select do |song|
-        !Dir.exist?(song) && File.basename(song.downcase).include?(search_str)
+        !Dir.exist?(song) && File.basename(song.downcase).include?(search_str.downcase)
     end
 end
 
+# Fetch the video information from a youtube url
+#
+# @param [String] url Youtube valid url
+#
+# @return [Hash] A hash containing video metadata such as title, duration, etc.
 def fetch_video_information(url)
     video_info = YtDlp.information(url)[0]
     raise "[ERROR] Unable to fetch video info" unless video_info
@@ -58,31 +89,14 @@ def handle_chapters(chapters)
     chapters[chapter_index - 1][:title]
 end
 
-def rename_file_if_needed(file_name, path)
-    option = prompt("Rename the file with name: '#{file_name}'? y/n -> ")
-    return file_name unless option.downcase == 'y'
-
-    file_name = prompt("Enter new file name without extension, optionally you can enter Artist name, eg. 'Queen - ' -> ")
-
-    # If we don't decide to write the artist name, take the parent folder as artist name
-    # TODO: Bug, if in the file name we include "-", it won't take the parent folder as artist name
-    # for example "Violin concerto in G-minor"
-    unless file_name.include?("-")
-        # TODO: What about if the artist name is a subfolder like Vivaldi/Opera 
-        artist_name = File.basename(path)
-        file_name = "#{artist_name} - #{file_name}"
-    end
-
-    file_name.strip
-end
-
 def verify_download(file_name, path)
     file_path = File.join(path, "#{file_name}.mp3")
     if File.file?(file_path) 
         puts "[Info] File downloaded at path #{file_path}"
+        return true
     else
         puts "[Error] Something file not downloaded at path #{file_path}"
-        exit(1)
+        return false
     end
 end
 
@@ -100,31 +114,70 @@ def download_audio(url, options)
     YtDlp.download(url, options)
 end
 
+# Download a song from youtube saving in a given path
+#
+# @param [String] path Path to be saved
+#
+# @return [Boolean] true if download was successful, false otherwise
 def download_song(path)
-    Dir.chdir(path)
-    puts "[Info] Changing to #{path}"
-    url = prompt("Enter youtube URL -> ")
-    video_info = fetch_video_information(url)
-    file_name = video_info[:title]         # Use youtube video title as default file name   
-    chapters = video_info[:chapters]
-    options = default_download_options
-
-    if chapters
-        file_name = handle_chapters(chapters)
-        # Because it is a regex it might contain special characters, let's scape them.
-        options[:download_section] = Regexp.escape(file_name)
-    else
-        puts "[INFO] Chapters not found"
-        options[:download_section] = chop_video if prompt("Chop the video? y/n -> ").downcase == 'y'
+    unless Dir.exist?(path)
+        puts "[ERROR] Path does not exist: #{path}"
+        return false
     end
-    
-    file_name = rename_file_if_needed(file_name, path)
-    options[:output] = "#{file_name}.%(ext)s"
-    download_audio(url, options)
-    verify_download(file_name, path)
 
-    # Go back to the folder where the script is
-    Dir.chdir(ROOT_FOLDER_SCRIPT)
+    Dir.chdir(path) do
+        puts "[Info] Changing to #{path}"
+        url = prompt("Enter youtube URL -> ").to_s.strip
+
+        if url.empty?
+            puts "[ERROR] Empty url"
+            return false
+        end
+
+        begin
+            video_info = fetch_video_information(url)
+        rescue => e
+            puts "[ERROR] Failed to fetch video information: #{e}"
+            return false
+        end
+
+        # Use youtube video title as default file name
+        file_name = sanitize_filename(video_info[:title].to_s)
+        chapters = video_info[:chapters]
+        options = default_download_options.dup
+
+        if chapters && !chapters.empty?
+            file_name = handle_chapters(chapters)
+            # Because it is a regex it might contain special characters, let's scape them.
+            options[:download_section] = Regexp.escape(file_name.to_s)
+            file_name = sanitize_filename(file_name)
+        else
+            puts "[INFO] Chapters not found"
+            options[:download_section] = chop_video if prompt("[INFO] Chop the video? y/n -> ").to_s.downcase == 'y'
+        end
+
+        options[:output] = "#{file_name}.%(ext)s"
+
+        begin
+            download_audio(url, options)
+        rescue => e
+            puts "[ERROR] Download failed: #{e}"
+            return false
+        end
+
+        unless verify_download(file_name, path)
+            puts "[ERROR] Download verificationfailed for #{file_name}.mp3"
+            return false
+        end
+
+        option = prompt("[INFO] Rename file with name: '#{file_name}'? y/n -> ").to_s.downcase
+        file_path = File.join(path, "#{file_name}.mp3")
+        if option.downcase == "y"
+            new_song_name = prompt("[INFO] Enter new file name without extension with format [Artist name -] new_name -> ").to_s.strip
+        end
+        rename_song(file_path, option.downcase == "y" ? new_song_name: file_name)
+        true
+    end
 end
 
 def create_folder(path)
@@ -142,27 +195,40 @@ def list_songs(songs)
     songs.each_with_index {|song, index| puts "[#{index + 1}] #{song}"}
 end
 
-def rename_song(songs)
-    list_songs(songs)
+# Rename a song with a new name
+#
+# @param [String] file_path
+#   Complete file path of the file to be renamed
+# @param [String] new_song_name
+#   New file name to use without extension
+#
+# @return [Boolean] true if successful rename, false otherwise
+def rename_song(file_path, new_song_name)
+    unless File.exist?(file_path)
+        puts "[ERROR] Source file does not exist: #{file_path}"
+        return false
+    end
 
-    index = Integer(prompt("Select the [number] you want to rename: ")) - 1
-    old_song = songs.at(index)
-    return puts "[Error] File not found" unless old_song
+    # Ensure new_song_name does not have extension
+    extension = File.extname(file_path)
+    new_song_name = File.basename(new_song_name, extension).to_s.strip
+    new_song_name = sanitize_filename(new_song_name)
 
-    artist_name = File.basename(File.dirname(old_song))
-    new_song = prompt("Enter the new file name without extension -> ")
-    # If we don't decide to write the artist name, take the parent folder as artist name
-    # This if won't be executed if we decide to write ourselves the artist/song name
-    unless new_song.include?("-")
-        new_song = "#{artist_name} - #{new_song}"
+    # Prepend artist from parent folder if no '-' present
+    unless new_song_name.include?("-")
+        artist_name = File.basename(File.dirname(file_path))
+        # What happen if the artist name is a folder? like Vivaldi/Opera
+        new_song_name = "#{artist_name} - #{new_song_name}"
     end
     
     begin
-        new_name = File.join(File.dirname(old_song), new_song) + ".mp3"
-        File.rename(old_song, new_name)
+        new_name = File.join(File.dirname(file_path), new_song_name + extension)
+        File.rename(file_path, new_name)
         puts "[Info] File renamed successfuly with new name #{new_name}"
-    rescue Errno::SystemCallError
-        puts "[Error] Error renaming the file #{old_song}"
+        true
+    rescue Errno::SystemCallError => e
+        puts "[Error] Error renaming the file #{file_path}: #{e}"
+        return false
     end
 end
 
@@ -271,10 +337,6 @@ def main
 
         case option
         when "d" # Download
-            # songs = search_files(root_folder, prompt("\nPlease enter the song/artist name: ").downcase)
-            # songs.empty? ? puts("[Info] Song/Artist not found\n") : list_songs(songs)
-
-            # continue = prompt("Continue Y/N? ").downcase
             str = prompt("Enter relative path to download the song starting from Music/ eg. Artist/folder1/folder2/... [c] to cancel -> " )
             if str != 'c'
                 path = File.join(root_folder, str)
@@ -284,7 +346,9 @@ def main
                 else
                     puts "[Info] Folder already exists"
                 end
-                download_song(path)
+                unless download_song(path)
+                    puts "[ERROR] Download song failed to: #{path}"
+                end
             end
 
         when "f" # Find
@@ -292,8 +356,18 @@ def main
             songs.empty? ? puts("[Info] Song/Artist not found\n") : list_songs(songs)
 
         when "r" # Rename
-            songs = search_files(root_folder, prompt("Please enter the song/artist name: ").downcase)
-            songs.empty? ? puts("[Info] Song/Artist not found\n") : rename_song(songs)
+            songs = search_files(root_folder, prompt("[INFO] Please enter the song/artist name to search: ").downcase)
+            list_songs(songs)
+            index = Integer(prompt("[INFO] Select the [number] you want to rename: ")) - 1
+            song_path = songs[index]
+
+            unless song_path
+                puts "[Error] File not found #{song_path}" unless song_path
+                return
+            end
+
+            new_song_name = prompt("[INFO] Enter new file name without extension with format [Artist name -] new_name -> ")
+            songs.empty? ? puts("[Info] Song/Artist not found\n") : rename_song(song_path, new_song_name)
 
         when "p" # Play song
             songs = search_files(root_folder, prompt("Please enter the song/artist name: ").downcase)
