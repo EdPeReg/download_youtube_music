@@ -74,14 +74,29 @@ def fetch_video_information(url)
     video_info
 end
 
-def handle_chapters(chapters)
-    # Handle the chapters from the video and return its name
-    puts "\n[Info] Video has chapters, please write chapter number to download specific chapter"
-    chapters.each_with_index { |chapter, index| puts "[#{index + 1}] #{chapter[:title]}"}
+# Handle the chapters from the video and return its chapter name
+#
+# @param [Hash] video_info Metadata from the youtube url
+#
+# @return [String, nil] Chapter name or nul if no chapter found
+def handle_chapters(video_info)
+    chapters = video_info[:chapters]
 
+    unless chapters
+        puts "[INFO] Chapters not found"
+        return nil
+    end
+
+    option = prompt("[Info] Chapters found, download specific chapter? y/n -> ").to_s.downcase
+    if option == "n"
+        return nil
+    end
+
+    chapters.each_with_index { |chapter, index| puts "[#{index + 1}] #{chapter[:title]}"}
     chapter_index = nil
+
     loop do
-        chapter_index = Integer(prompt("Enter chapter number-> "))
+        chapter_index = Integer(prompt("[Info] Enter chapter number-> "))
         break if chapter_index && chapter_index.between?(1, chapters.size)
         puts "[ERROR] Invalid chapter number, please try again"
     end
@@ -101,6 +116,7 @@ def verify_download(file_name, path)
 end
 
 def chop_video
+    # TODO: Does it work?
     # Return a valid range with Hours:Minutes:Seconds with the form start-end to be used for yt-dlp
     loop do
         range_video = prompt("Enter the range with Hour:Minutes:Seconds with the form start-end -> ")
@@ -143,17 +159,15 @@ def download_song(path)
 
         # Use youtube video title as default file name
         file_name = sanitize_filename(video_info[:title].to_s)
-        chapters = video_info[:chapters]
+        chapter_name = handle_chapters(video_info)
         options = default_download_options.dup
 
-        if chapters && !chapters.empty?
-            file_name = handle_chapters(chapters)
+        if chapter_name && !chapter_name.empty?
             # Because it is a regex it might contain special characters, let's scape them.
-            options[:download_section] = Regexp.escape(file_name.to_s)
-            file_name = sanitize_filename(file_name)
-        else
-            puts "[INFO] Chapters not found"
-            options[:download_section] = chop_video if prompt("[INFO] Chop the video? y/n -> ").to_s.downcase == 'y'
+            options[:download_section] = Regexp.escape(chapter_name.to_s)
+            file_name = sanitize_filename(chapter_name)
+        elsif prompt("[INFO] Chop the video? y/n -> ").to_s.downcase == 'y'
+            options[:download_section] = chop_video
         end
 
         options[:output] = "#{file_name}.%(ext)s"
