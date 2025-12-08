@@ -76,9 +76,9 @@ end
 
 # Handle the chapters from the video and return its chapter name
 #
-# @param [Hash] video_info Metadata from the youtub eurl
+# @param [Hash] video_info Metadata from the youtube url
 #
-# @return [String] Chapter name
+# @return [String, nil] Chapter name or nul if no chapter found
 def handle_chapters(video_info)
     chapters = video_info[:chapters]
 
@@ -87,14 +87,14 @@ def handle_chapters(video_info)
         return nil
     end
 
-    chapters.each_with_index { |chapter, index| puts "[#{index + 1}] #{chapter[:title]}"}
     option = prompt("[Info] Chapters found, download specific chapter? y/n -> ").to_s.downcase
-
     if option == "n"
         return nil
     end
 
+    chapters.each_with_index { |chapter, index| puts "[#{index + 1}] #{chapter[:title]}"}
     chapter_index = nil
+
     loop do
         chapter_index = Integer(prompt("[Info] Enter chapter number-> "))
         break if chapter_index && chapter_index.between?(1, chapters.size)
@@ -116,6 +116,7 @@ def verify_download(file_name, path)
 end
 
 def chop_video
+    # TODO: Does it work?
     # Return a valid range with Hours:Minutes:Seconds with the form start-end to be used for yt-dlp
     loop do
         range_video = prompt("Enter the range with Hour:Minutes:Seconds with the form start-end -> ")
@@ -165,9 +166,10 @@ def download_song(path)
             # Because it is a regex it might contain special characters, let's scape them.
             options[:download_section] = Regexp.escape(chapter_name.to_s)
             file_name = sanitize_filename(chapter_name)
+        elsif prompt("[INFO] Chop the video? y/n -> ").to_s.downcase == 'y'
+            options[:download_section] = chop_video
         end
 
-        options[:download_section] = chop_video if prompt("[INFO] Chop the video? y/n -> ").to_s.downcase == 'y'
         options[:output] = "#{file_name}.%(ext)s"
 
         begin
