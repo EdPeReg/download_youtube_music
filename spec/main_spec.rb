@@ -429,3 +429,44 @@ RSpec.describe "#download_song" do
     end
   end
 end
+
+RSpec.describe "#handle_chapters" do
+  context "when there are no chapters" do
+    let(:video_info) { {} }
+
+    it "returns nil" do
+      expect(self).not_to receive(:prompt)
+      expect(handle_chapters(video_info)).to be_nil
+    end
+  end
+
+  context "when there are chapters" do
+    let(:video_info) {
+      {
+        chapters: [
+          { title: "chapter1" },
+          { title: "chapter2" },
+        ]
+      } 
+    }
+
+    it "returns nil when the user chooses not to download a chapter" do
+      allow(self).to receive(:prompt).once.and_return("n")
+      expect(handle_chapters(video_info)).to be_nil
+    end
+
+    it "returns the chapter name when choosing an invalid and valid index" do
+      allow(self).to receive(:prompt).and_return("y", "-1", "5", "1")
+      expect(handle_chapters(video_info)).to eq("chapter1")
+    end
+  end
+
+  context "when chapters list are empty" do
+    let(:video_info) { { chapters: [] } }
+
+    it "returns nil when chapter list is empty" do
+      expect(self).not_to receive(:prompt)
+      expect(handle_chapters(video_info)).to be_nil
+    end
+  end
+end
