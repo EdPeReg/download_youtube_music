@@ -7,7 +7,7 @@ require 'fileutils'
 require "readline"
 
 require 'yt-dlp.rb'
-require 'taglib'
+require 'taglib.rb'
 
 # For the hours, it will only accept until 23, I don't think you will find a video more than 23 hours long
 # Thanks copilot for this regex.
@@ -42,17 +42,19 @@ def sanitize_filename(name)
   s
 end
 
-# Helper function to prompt user information
+# Helper function to prompt user information and store in memory user input history
+#
+# @param message [String] message to show to user when prompting
+#
+# @return [String] User's input
 def prompt(message)
     Readline.readline(message, add_hist: true)
 end
 
 # Collects all files given a folder based in a string
 #
-# @param [String] root_folder
-#   Folder where we are going to start searching
-# @param [String] search_str
-#   String to be search
+# @param [String] root_folder Folder where we are going to start searching
+# @param [String] search_str String to be search
 #
 # @return [Array<String>] A list of files paths that match the search string, empty list if not matching
 def search_files(root_folder, search_str)
@@ -68,13 +70,15 @@ end
 #
 # @return [Hash] A hash containing video metadata such as title, duration, etc.
 def fetch_video_information(url)
+    # TODO: Refactor, maybe the raise message is redundant, maybe we should let the caller
+    # to log the message and handle the exception?
     video_info = YtDlp.information(url)[0]
     raise "[ERROR] Unable to fetch video info" unless video_info
 
     video_info
 end
 
-# Handle the chapters from the video and return its chapter name
+# Handle the chapters from the video if exist and return its chapter name
 #
 # @param [Hash] video_info Metadata from the youtube url
 #
@@ -104,13 +108,21 @@ def handle_chapters(video_info)
     chapters[chapter_index - 1][:title]
 end
 
+# Check if the downloaded file exist or not
+#
+# @param [String] file_name Just the filename without extension
+# @param [String] path Path of the downloaded file
+#
+# @return [true, false] True if the file exist, false otherwise
 def verify_download(file_name, path)
+    # TODO: Check responsabilities, mixing logging messages, maybe let the caller to
+    # handle the logging messages
     file_path = File.join(path, "#{file_name}.mp3")
     if File.file?(file_path) 
         puts "[Info] File downloaded at path #{file_path}"
         return true
     else
-        puts "[Error] Something file not downloaded at path #{file_path}"
+        puts "[Error] File not downloaded at path #{file_path}"
         return false
     end
 end
@@ -125,8 +137,11 @@ def chop_video
     end
 end
 
+# Download the mp3 from the youtube video
+#
+# @param [String] url Youtube URL
+# @param [String] options Options to download the audio
 def download_audio(url, options)
-    # Download the mp3 from the youtube video
     YtDlp.download(url, options)
 end
 
@@ -180,7 +195,7 @@ def download_song(path)
         end
 
         unless verify_download(file_name, path)
-            puts "[ERROR] Download verificationfailed for #{file_name}.mp3"
+            puts "[ERROR] Download verification failed for #{file_name}.mp3"
             return false
         end
 
@@ -189,12 +204,20 @@ def download_song(path)
         if option.downcase == "y"
             new_song_name = prompt("[INFO] Enter new file name without extension with format [Artist name -] new_name -> ").to_s.strip
         end
+        # TODO: We arent checking its return value
         rename_song(file_path, option.downcase == "y" ? new_song_name: file_name)
         true
     end
 end
 
+# Create a folder in the specific path
+#
+# @param [String] path Path where the folder is going to be created
 def create_folder(path)
+    # TODO: Refactor this code, too many responosabilities
+    # - Login messages? why logging messages is not ok?
+    # - rescue never enters
+    # - let the original error propagates and whoever calls this function let him handle it
     begin
         FileUtils.mkdir_p(path)
         puts "[Info] Folder created at #{path}"
@@ -204,17 +227,22 @@ def create_folder(path)
     end
 end
 
+# Shows a song list to the user
+#
+# @param [Array<String>] songs Contains the songs to be printed
 def list_songs(songs)
     # List songs in a list format starting from index 1
+    # TODO: We are mixing the next responsabilities:
+    # TODO: - Formtting text
+    # TODO: - Printing
+    # TODO: It would be ideal to separate them in functions?
     songs.each_with_index {|song, index| puts "[#{index + 1}] #{song}"}
 end
 
 # Rename a song with a new name
 #
-# @param [String] file_path
-#   Complete file path of the file to be renamed
-# @param [String] new_song_name
-#   New file name to use without extension
+# @param [String] file_path Complete file path of the file to be renamed
+# @param [String] new_song_name New file name to use without extension
 #
 # @return [Boolean] true if successful rename, false otherwise
 def rename_song(file_path, new_song_name)
@@ -240,37 +268,49 @@ def rename_song(file_path, new_song_name)
         File.rename(file_path, new_name)
         puts "[Info] File renamed successfuly with new name #{new_name}"
         true
-    rescue Errno::SystemCallError => e
+    rescue SystemCallError => e
         puts "[Error] Error renaming the file #{file_path}: #{e}"
         return false
     end
 end
 
+# Play a song using vlc
+#
+# @param [Array<String>] songs List of songs to show and select from it
+#
+# @return nil if invalid index song selected
 def play_song(songs)
     list_songs(songs)
     index = Integer(prompt("Select the [number] you want to play: ")) - 1
     song = songs.at(index)
+    # TODO: Make the caller to log the message, currently only returning nil because puts
     return puts "[Error] File not found" unless song
+    # TODO: Should I use the system return value to know if it was executed successfuly?
     system("vlc", "#{song}")
 end
 
+# Run the bash script
+#
+# @param [String] csv_path CSV Path required by the bash script
 def run_query_video(csv_path)
-    Process.detach(Process.spawn("kitty", "./query_video.sh", csv_path))
+    Process.detach(
+        Process.spawn("kitty", "./query_video.sh", csv_path)
+    )
 end
 
+# It loads the history file content to the history buffer
 def load_history
+    # TODO: Check if the history is actually loaded now the main.rb lives in another folder
+    # TODO: Add logging messages if it is loaded successfuly or not?
     if File.exist?(FILE_NAME)
-        File.readlines(FILE_NAME).each { |line| Readline::HISTORY.push(line.chomp)}
+        File.readlines(FILE_NAME).each {
+            |line| Readline::HISTORY.push(line.chomp)
+        }
     end
 end
 
 # Save the user input history in a file "history.txt"
-#
-# File will be created if does not exist and it will append
-# each element.
 def save_history
-
-    # Save user input history in a text file called history.txt
     # Remove duplicated elements.
     unique_history = Readline::HISTORY.to_a.uniq
     File.open(FILE_NAME, "w") do |f|
@@ -358,6 +398,7 @@ def main
             if str != 'c'
                 path = File.join(root_folder, str)
                     
+                # TODO: Check workflow for create_folder, let main() handle the error and workflow
                 unless Dir.exist?(path)
                     create_folder(path)
                 else
@@ -415,4 +456,4 @@ def main
     save_history
 end
 
-main
+main if __FILE__ == $PROGRAM_NAME
