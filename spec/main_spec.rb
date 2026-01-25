@@ -378,6 +378,54 @@ RSpec.describe "#download_song" do
 
         expect(download_song(path)).to be(false)
       end
+
+      # Chapter handling section
+
+      it "uses chapter name for download section, output filename, and rename when chapter exists" do
+        expected_path = File.join(path, "#{chapter_name}.mp3")
+
+        allow(self).to receive(:sanitize_filename).and_return(chapter_name)
+
+        expect(self).to receive(:download_audio).with(url, {download_section: chapter_name, output: chapter_name + ".%(ext)s"})
+        expect(self).to receive(:verify_download).with(chapter_name, path).and_return(true)
+        expect(self).to receive(:rename_song).with(expected_path, chapter_name)
+
+        download_song(path)
+      end
+
+      it "uses download section when we chop video" do
+        allow(self).to receive(:handle_chapters).and_return(nil)
+        allow(self).to receive(:prompt).and_return(url, "y")
+
+        expect(self).to receive(:chop_video).and_return("00:00:00-00:00:10")
+        expect(self).to receive(:download_audio).with(url, {
+          download_section: "00:00:00-00:00:10",
+          output: "#{filename}.%(ext)s"
+        })
+
+        download_song(path)
+      end
+
+      it "does not use download section when chop video is not happening" do
+        allow(self).to receive(:handle_chapters).and_return(nil)
+        allow(self).to receive(:prompt).and_return(url, "n")
+
+        expect(self).to receive(:download_audio).with(url, {
+          output: "#{filename}.%(ext)s"
+        })
+
+        download_song(path)
+      end
+
+      it "returns true when the entire download flow succeeds" do
+        allow(self).to receive(:prompt).and_return(url, "n")
+  
+        expect(self).to receive(:download_audio)
+        expect(self).to receive(:verify_download).and_return(true)
+        expect(self).to receive(:rename_song)
+        
+        expect(download_song(path)).to be(true)
+      end
     end
   end
 end
