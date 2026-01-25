@@ -86,7 +86,7 @@ end
 def handle_chapters(video_info)
     chapters = video_info[:chapters]
 
-    unless chapters
+    unless chapters&.any?
         puts "[INFO] Chapters not found"
         return nil
     end
