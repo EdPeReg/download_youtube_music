@@ -397,9 +397,9 @@ RSpec.describe "#download_song" do
         allow(self).to receive(:handle_chapters).and_return(nil)
         allow(self).to receive(:prompt).and_return(url, "y")
 
-        expect(self).to receive(:chop_video).and_return("00:00:00-00:00:10")
+        expect(self).to receive(:chop_video).and_return("*00:00:00-00:00:10")
         expect(self).to receive(:download_audio).with(url, {
-          download_section: "00:00:00-00:00:10",
+          download_section: "*00:00:00-00:00:10",
           output: "#{filename}.%(ext)s"
         })
 
@@ -468,5 +468,22 @@ RSpec.describe "#handle_chapters" do
       expect(self).not_to receive(:prompt)
       expect(handle_chapters(video_info)).to be_nil
     end
+  end
+end
+
+RSpec.describe "#chop_video" do
+  let(:expected) { "*00:00:10-00:00:20" }
+  let(:range) { "#{expected}" }
+
+  it "returns a valid video range" do
+    allow(self).to receive(:prompt).and_return("00:00:10-00:00:20")
+
+    expect(chop_video).to eq(expected)
+  end
+
+  it "eventually returns a valid range after invalid input" do
+    allow(self).to receive(:prompt).and_return("expected", "0:190", "00:00:10-00:00:20")
+
+    expect(chop_video).to eq(expected)
   end
 end

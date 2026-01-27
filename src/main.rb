@@ -127,9 +127,11 @@ def verify_download(file_name, path)
     end
 end
 
+# Get a video range to chop the video
+#
+# @return a valid range with Hours:Minutes:Seconds with the form start-end to be used for yt-dlp
 def chop_video
     # TODO: Does it work?
-    # Return a valid range with Hours:Minutes:Seconds with the form start-end to be used for yt-dlp
     loop do
         range_video = prompt("Enter the range with Hour:Minutes:Seconds with the form start-end -> ")
         return "*#{range_video}" if TIME_RANGE_REGEX.match?(range_video)
