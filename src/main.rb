@@ -329,7 +329,7 @@ def tag_song(songs)
     fields = [:comment, :album, :artist, :title]
 
     list_songs(songs)
-    index = Integer(prompt("Select the [number] you want to play: ")) - 1
+    index = Integer(prompt("Select the [number] you want to tag: ")) - 1
     song = songs[index]
     unless song
         puts "[Error] File not found" unless song
